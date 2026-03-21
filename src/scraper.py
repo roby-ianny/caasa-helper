@@ -1,3 +1,5 @@
+import re
+import string
 import time
 
 import requests
@@ -5,6 +7,59 @@ from bs4 import BeautifulSoup
 
 REQUESTS_DELAY = 2.0
 MAX_PAGES = 1
+
+KEY_VALUE_FIELDS = {"floor": "piano", "bathrooms": "bagni"}
+
+BOOLEAN_FLAGS = {
+    "con terrazza",
+    "con balcone",
+    "arredato",
+    "cantina",
+    "posto auto",
+    "con giardino",
+    "con box",
+    "acensore",
+}
+
+
+def __get_span_text(span) -> str:
+    icon = span.find("i")
+    if icon and icon.get("title"):
+        return icon["title"].strip()
+    bold = span.find("b")
+    if bold and bold.get("title"):
+        return bold["title"].strip()
+    return span.get_text(separator=" ", strip=True)
+
+
+def __parse_detail_text(text: str) -> tuple | None:
+    text_lower = text.lower()
+    ce_match = re.match(r"classe energetica\s+(.+)", text_lower)
+    if ce_match:
+        return ("classe energetica", text.split()[-1])
+    for prefix, key in KEY_VALUE_FIELDS.items():
+        if text_lower.startswith(prefix + ":"):
+            value = text[len(prefix) + 1 :].strip()
+            return (key, value)
+    if text_lower in BOOLEAN_FLAGS:
+        return (__sanitize_key(text_lower), True)
+    return ("extra_" + __sanitize_key(text_lower), True)
+
+
+def parse_details(card) -> dict:
+    details = {}
+    details_div = card.find("div", class_="result-item__details")
+    if not details_div:
+        return details
+    for span in details_div.find_all("span"):
+        raw_text = __get_span_text(span)
+        if not raw_text:
+            continue
+        result = __parse_detail_text(raw_text)
+        if result:
+            key, value = result
+            details[key] = value
+    return details
 
 
 def fetch_page(url):
@@ -15,6 +70,18 @@ def fetch_page(url):
     except requests.RequestException as e:
         print(f"Error fetching {url}: {e}")
         return None
+
+
+def __sanitize_key(text: str) -> str:
+    """
+    Return a sanitized key for SQLite queries
+    """
+    allowed = string.ascii_lowercase + string.digits
+    key = text.lower().strip()
+    # map any invalid characters to underscores
+    table = str.maketrans({c: "_" for c in key if c not in allowed})
+    key = key.translate(table).strip("_")
+    return key if key else "unknown"
 
 
 def parse_listing(card) -> dict:
@@ -36,7 +103,7 @@ def parse_listing(card) -> dict:
         el = card.select_one(selector)
         return el.get(attr) if el else None
 
-    return {"title": safe_text(".result-item__title")}
+    return {"title": safe_text(".result-item__title"), **parse_details(card)}
 
 
 def scrape_search(search_url: str, max_pages: int = MAX_PAGES) -> list[dict]:
