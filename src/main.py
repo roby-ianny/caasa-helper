@@ -13,8 +13,10 @@ def cmd_scrape(args):
     """
 
     init_db()
-    print(f"Scraping {args.url}")
-    listings = scrape_search(args.url)
+    print(f"Scraping {args.pages} pages from {args.url}")
+    if args.test:
+        print("TEST MODE: parsing only one card")
+    listings = scrape_search(args.url, args.pages, args.test)
     inserted, duplicates = bulk_insert(listings)
 
 
@@ -36,6 +38,11 @@ def main():
     p_scrape.add_argument("url", help="query from 'copy-link' in caasa.it")
     p_scrape.add_argument(
         "--pages", type=int, default=5, help="number of pages to scrape"
+    )
+    p_scrape.add_argument(
+        "--test",
+        help="parses only one card",
+        action="store_true",
     )
 
     # export subcommand
