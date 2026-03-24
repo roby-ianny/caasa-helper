@@ -1,0 +1,11 @@
+[project]
+name = "caasa-helper"
+version = "0.1.0"
+description = "A simple python script to save caasa.it queries in a local database"
+readme = "README.md"
+requires-python = ">=3.14"
+dependencies = [
+    "beautifulsoup4>=4.14.3",
+    "lxml>=6.0.2",
+    "requests>=2.32.5",
+]

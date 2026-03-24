@@ -7,14 +7,15 @@ A simple python script that exports data from caasa.it and export them in csv
 ## Setup 
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-.venv/bin/activate
-pip install requirements.txt
+# install uv
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# create venv with dependencies installed
+uv sync
 ```
 
 ## Example of run 
 
 ```bash
-python3 src/main.py scrape https://www.caasa.it/roma/roma/appartamento/in-affitto.html
+uv run src/main.py scrape https://www.caasa.it/roma/roma/appartamento/in-affitto.html
 ```
