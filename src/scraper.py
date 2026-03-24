@@ -34,13 +34,6 @@ def parse_listing(card: Tag) -> dict:
     Extract data from a single listing card
     """
 
-    def safe_text(selector: str):
-        """
-        Give the text of an element or None if not found
-        """
-        el = card.select_one(selector)
-        return el.get_text(strip=True) if el else None
-
     def __parse_item_details(card: Tag) -> List:
         """
         Parse the .result-item__details element to extract the details of a listing
@@ -56,8 +49,17 @@ def parse_listing(card: Tag) -> dict:
 
         return details
 
-    def get_features(details: Tag) -> dict:
-        features_list = __parse_item_details(details)
+    def get_title_and_link(card: Tag) -> dict:
+        title_info = card.select_one(".result-item__title").select_one("a")
+        if title_info:
+            return {
+                "title": title_info.get_text(strip=True),
+                "link": title_info.get("href"),
+            }
+        return {}
+
+    def get_features(card: Tag) -> dict:
+        features_list = __parse_item_details(card)
 
         details_dict = {}
 
@@ -76,14 +78,35 @@ def parse_listing(card: Tag) -> dict:
 
         return details_dict
 
+    def get_price_info(card: Tag) -> dict:
+        price_info = card.select_one(".result-item__price").select("span")
+        if price_info:
+            # price example string "1.850 € mese"
+            price = int(
+                price_info[0].get_text(strip=True).split(" ")[0].replace(".", "")
+            )
+            # squared meters example string "m² 120"
+            m2 = int(price_info[1].get_text(strip=True).split(" ")[1])
+            return {"price": price, "m2": m2}
+        else:
+            return {}
+
+    def get_address(card: Tag) -> dict:
+        address_info = card.select_one(".result-item__address")
+        print(address_info)
+        if address_info:
+            address = address_info.get_text(strip=True)
+            link = address_info.select_one("a").get("href")
+            print(f"Address: {address}, link: {link}")
+            return {"address": address, "address_link": link}
+        else:
+            return {}
+
     return {
-        "title": safe_text(".result-item__title"),
-        # append other details got from get_details
+        **get_title_and_link(card),
         **get_features(card),
-        # TODO:
-        # **get_price_info, # tag:
-        # **get_address,
-        # **get_link,
+        **get_price_info(card),
+        **get_address(card),
     }
 
 
