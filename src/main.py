@@ -48,7 +48,7 @@ def main():
     # export subcommand
     p_export = subparsers.add_parser("export", help="export to CSV")
     p_export.add_argument(
-        "--output", help="output file path"
+        "--output", default="listings.csv", help="output file path"
     )  # listings.csv is the default in exporter.py
 
     args = parser.parse_args()

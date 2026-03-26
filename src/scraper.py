@@ -1,5 +1,6 @@
 import time
 from re import search
+from urllib.parse import parse_qs, urlparse
 
 import requests
 from bs4 import BeautifulSoup
@@ -54,7 +55,7 @@ def parse_listing(card: Tag) -> dict:
         if title_info:
             return {
                 "title": title_info.get_text(strip=True),
-                "link": title_info.get("href"),
+                "link": parse_qs(urlparse(title_info.get("href")).query).get("url")[0],
             }
         return {}
 
@@ -66,11 +67,11 @@ def parse_listing(card: Tag) -> dict:
         for feature in features_list:
             if search(r"bagni:\s*(\d+)", feature):
                 details_dict.update(
-                    {"bathrooms": int(search(r"bagni:\s*(\d+)", feature).group(1))}
+                    {"bagni": int(search(r"bagni:\s*(\d+)", feature).group(1))}
                 )
             elif search(r"piano:\s*(\d+)", feature):
                 details_dict.update(
-                    {"floor": search(r"piano:\s*(\d+)", feature).group(1)}
+                    {"piano": search(r"piano:\s*(\d+)", feature).group(1)}
                 )
             else:
                 if feature in BOOLEAN_FEATURES.keys():
@@ -87,27 +88,27 @@ def parse_listing(card: Tag) -> dict:
             )
             # squared meters example string "m² 120"
             m2 = int(price_info[1].get_text(strip=True).split(" ")[1])
-            return {"price": price, "m2": m2}
+            return {"prezzo": price, "m2": m2}
         else:
             return {}
 
     def get_address(card: Tag) -> dict:
         address_info = card.select_one(".result-item__address")
-        print(address_info)
         if address_info:
             address = address_info.get_text(strip=True)
             link = address_info.select_one("a").get("href")
-            print(f"Address: {address}, link: {link}")
-            return {"address": address, "address_link": link}
+            return {"indirizzo": address, "link_indirizzo": link}
         else:
             return {}
 
-    return {
+    result = {
         **get_title_and_link(card),
-        **get_features(card),
         **get_price_info(card),
         **get_address(card),
+        **get_features(card),
     }
+
+    return result
 
 
 def scrape_search(
