@@ -1,6 +1,6 @@
 import csv
 
-from db import get_connection
+from db import get_connection, init_db
 
 
 def export_csv(output_path: str = "listings.csv"):
@@ -8,6 +8,7 @@ def export_csv(output_path: str = "listings.csv"):
     Exports all the listings to a CSV file, or a custom subset if a query is provided.
     """
 
+    init_db()
     sql = "SELECT * FROM listings ORDER BY id ASC"
 
     # Execute query on db

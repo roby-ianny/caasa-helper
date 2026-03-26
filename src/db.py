@@ -25,6 +25,19 @@ def init_db():
             CREATE TABLE IF NOT EXISTS listings (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 title TEXT NOT NULL,
+                link TEXT NOT NULL UNIQUE,
+                prezzo INTEGER,
+                m2 INTEGER,
+                indirizzo TEXT,
+                link_indirizzo TEXT,
+                bagni INTEGER,
+                piano TEXT,
+                terrazza BOOLEAN DEFAULT FALSE,
+                giardino BOOLEAN DEFAULT FALSE,
+                balcone BOOLEAN DEFAULT FALSE,
+                arredato BOOLEAN DEFAULT FALSE,
+                posto_auto BOOLEAN DEFAULT FALSE,
+                cantina BOOLEAN DEFAULT FALSE,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
         """)
@@ -48,7 +61,8 @@ def insert_listing(listing: dict) -> bool:
     Insert a listing into the database.
     Returns True if the listing was inserted, False if it already exists.
     """
-    clean_listing = {__sanitize_key(k): v for k, v in listing.items()}
+    cols = ", ".join(listing.keys())
+    vals = ", ".join([f":{k}" for k in listing])
 
     with get_connection() as conn:
         ensure_columns(conn, clean_listing)
@@ -57,8 +71,8 @@ def insert_listing(listing: dict) -> bool:
         placeholders = ", ".join(f":{k}" for k in clean_listing)
 
         cursor = conn.execute(
-            f"INSERT OR IGNORE INTO listings ({columns}) VALUES ({placeholders})",
-            clean_listing,
+            f"INSERT OR IGNORE INTO listings ({cols}) VALUES ({vals})",
+            listing,
         )
 
         conn.commit()

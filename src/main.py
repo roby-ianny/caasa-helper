@@ -13,8 +13,10 @@ def cmd_scrape(args):
     """
 
     init_db()
-    print(f"Scraping {args.url}")
-    listings = scrape_search(args.url)
+    print(f"Scraping {args.pages} pages from {args.url}")
+    if args.test:
+        print("TEST MODE: parsing only one card")
+    listings = scrape_search(args.url, args.pages, args.test)
     inserted, duplicates = bulk_insert(listings)
 
 
@@ -37,11 +39,16 @@ def main():
     p_scrape.add_argument(
         "--pages", type=int, default=5, help="number of pages to scrape"
     )
+    p_scrape.add_argument(
+        "--test",
+        help="parses only one card",
+        action="store_true",
+    )
 
     # export subcommand
     p_export = subparsers.add_parser("export", help="export to CSV")
     p_export.add_argument(
-        "--output", help="output file path"
+        "--output", default="listings.csv", help="output file path"
     )  # listings.csv is the default in exporter.py
 
     args = parser.parse_args()

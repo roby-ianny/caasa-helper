@@ -1,65 +1,25 @@
 import re
 import string
 import time
+from re import search
+from urllib.parse import parse_qs, urlparse
 
 import requests
 from bs4 import BeautifulSoup
+from bs4.element import Tag
+from typing_extensions import List
 
 REQUESTS_DELAY = 2.0
 MAX_PAGES = 1
 
-KEY_VALUE_FIELDS = {"floor": "piano", "bathrooms": "bagni"}
-
-BOOLEAN_FLAGS = {
-    "con terrazza",
-    "con balcone",
-    "arredato",
-    "cantina",
-    "posto auto",
-    "con giardino",
-    "con box",
-    "acensore",
+BOOLEAN_FEATURES = {
+    "con terrazza": "terrazza",
+    "con giardino": "giardino",
+    "con balcone": "balcone",
+    "arredato": "arredato",
+    "posto auto": "posto_auto",
+    "cantina": "cantina",
 }
-
-
-def __get_span_text(span) -> str:
-    icon = span.find("i")
-    if icon and icon.get("title"):
-        return icon["title"].strip()
-    bold = span.find("b")
-    if bold and bold.get("title"):
-        return bold["title"].strip()
-    return span.get_text(separator=" ", strip=True)
-
-
-def __parse_detail_text(text: str) -> tuple | None:
-    text_lower = text.lower()
-    ce_match = re.match(r"classe energetica\s+(.+)", text_lower)
-    if ce_match:
-        return ("classe energetica", text.split()[-1])
-    for prefix, key in KEY_VALUE_FIELDS.items():
-        if text_lower.startswith(prefix + ":"):
-            value = text[len(prefix) + 1 :].strip()
-            return (key, value)
-    if text_lower in BOOLEAN_FLAGS:
-        return (__sanitize_key(text_lower), True)
-    return ("extra_" + __sanitize_key(text_lower), True)
-
-
-def parse_details(card) -> dict:
-    details = {}
-    details_div = card.find("div", class_="result-item__details")
-    if not details_div:
-        return details
-    for span in details_div.find_all("span"):
-        raw_text = __get_span_text(span)
-        if not raw_text:
-            continue
-        result = __parse_detail_text(raw_text)
-        if result:
-            key, value = result
-            details[key] = value
-    return details
 
 
 def fetch_page(url):
@@ -72,44 +32,96 @@ def fetch_page(url):
         return None
 
 
-def __sanitize_key(text: str) -> str:
-    """
-    Return a sanitized key for SQLite queries
-    """
-    allowed = string.ascii_lowercase + string.digits
-    key = text.lower().strip()
-    # map any invalid characters to underscores
-    table = str.maketrans({c: "_" for c in key if c not in allowed})
-    key = key.translate(table).strip("_")
-    return key if key else "unknown"
-
-
-def parse_listing(card) -> dict:
+def parse_listing(card: Tag) -> dict:
     """
     Extract data from a single listing card
     """
 
-    def safe_text(selector):
+    def __parse_item_details(card: Tag) -> List:
         """
-        Give the text of an element or None if not found
+        Parse the .result-item__details element to extract the details of a listing
         """
-        el = card.select_one(selector)
-        return el.get_text(strip=True) if el else None
+        details = []
+        for item in card.select_one(".result-item__details").select("span"):
+            if item.find("i"):
+                details.append(item.find("i").get("title"))
+            elif item.find("b"):
+                details.append(item.find("b").get("title"))
+            else:
+                details.append(item.get_text(strip=True))
 
-    def safe_attr(selector, attr):
-        """
-        Give the HTML attribute or None if not found
-        """
-        el = card.select_one(selector)
-        return el.get(attr) if el else None
+        return details
 
-    return {"title": safe_text(".result-item__title"), **parse_details(card)}
+    def get_title_and_link(card: Tag) -> dict:
+        title_info = card.select_one(".result-item__title").select_one("a")
+        if title_info:
+            return {
+                "title": title_info.get_text(strip=True),
+                "link": parse_qs(urlparse(title_info.get("href")).query).get("url")[0],
+            }
+        return {}
+
+    def get_features(card: Tag) -> dict:
+        features_list = __parse_item_details(card)
+
+        details_dict = {}
+
+        for feature in features_list:
+            if search(r"bagni:\s*(\d+)", feature):
+                details_dict.update(
+                    {"bagni": int(search(r"bagni:\s*(\d+)", feature).group(1))}
+                )
+            elif search(r"piano:\s*(\d+)", feature):
+                details_dict.update(
+                    {"piano": search(r"piano:\s*(\d+)", feature).group(1)}
+                )
+            else:
+                if feature in BOOLEAN_FEATURES.keys():
+                    details_dict.update({BOOLEAN_FEATURES.get(feature): True})
+
+        return details_dict
+
+    def get_price_info(card: Tag) -> dict:
+        price_info = card.select_one(".result-item__price").select("span")
+        if price_info:
+            # price example string "1.850 € mese"
+            price = int(
+                price_info[0].get_text(strip=True).split(" ")[0].replace(".", "")
+            )
+            # squared meters example string "m² 120"
+            m2 = int(price_info[1].get_text(strip=True).split(" ")[1])
+            return {"prezzo": price, "m2": m2}
+        else:
+            return {}
+
+    def get_address(card: Tag) -> dict:
+        address_info = card.select_one(".result-item__address")
+        if address_info:
+            address = address_info.get_text(strip=True)
+            link = address_info.select_one("a").get("href")
+            return {"indirizzo": address, "link_indirizzo": link}
+        else:
+            return {}
+
+    result = {
+        **get_title_and_link(card),
+        **get_price_info(card),
+        **get_address(card),
+        **get_features(card),
+    }
+
+    return result
 
 
-def scrape_search(search_url: str, max_pages: int = MAX_PAGES) -> list[dict]:
+def scrape_search(
+    search_url: str, max_pages: int = MAX_PAGES, testMode: bool = False
+) -> list[dict]:
     """
     Get all the search results and return them as a list of dicts
     """
+
+    if testMode:
+        max_pages = 1
 
     results = []
 
@@ -126,10 +138,16 @@ def scrape_search(search_url: str, max_pages: int = MAX_PAGES) -> list[dict]:
 
         if not cards:
             print("No listing found - end of search")
+            break
 
-        for card in cards:
-            single_result = parse_listing(card)
-            results.append(single_result)
+        if testMode:
+            cards = cards[:1]
+            results.append(parse_listing(cards[0]))
+            break
+        else:
+            for card in cards:
+                single_result = parse_listing(card)
+                results.append(single_result)
 
         print(f" Found {len(cards)} listings on page {page}")
 
