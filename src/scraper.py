@@ -1,3 +1,5 @@
+import re
+import string
 import time
 from re import search
 from urllib.parse import parse_qs, urlparse

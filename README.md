@@ -19,3 +19,10 @@ uv sync
 ```bash
 uv run src/main.py scrape https://www.caasa.it/roma/roma/appartamento/in-affitto.html
 ```
+
+> Since this is my first personal project, I'm using AI to guide me on the development and personal learning experience
+
+## Acknowledgments
+
+This project was developed with the assistance of AI tools, which were used for code 
+generation and as learning support throughout the development process.

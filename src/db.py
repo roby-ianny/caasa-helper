@@ -1,5 +1,7 @@
 import sqlite3
 
+from scraper import __sanitize_key
+
 DB_PATH = "caasa.db"
 
 
@@ -42,6 +44,18 @@ def init_db():
         conn.commit()
 
 
+def ensure_columns(conn: sqlite3.Connection, listing: dict):
+    """
+    Add missing colums fo any new key found in listing
+    """
+    cursor = conn.execute("PRAGMA table_info(listings)")
+    existing = {row["name"] for row in cursor.fetchall()}
+
+    for key in listing:
+        if key not in existing:
+            conn.execute(f"ALTER TABLE listings ADD COLUMN[{key}] TEXT")
+
+
 def insert_listing(listing: dict) -> bool:
     """
     Insert a listing into the database.
@@ -51,11 +65,18 @@ def insert_listing(listing: dict) -> bool:
     vals = ", ".join([f":{k}" for k in listing])
 
     with get_connection() as conn:
+        ensure_columns(conn, clean_listing)
+
+        columns = ", ".join(f"[{k}]" for k in clean_listing)
+        placeholders = ", ".join(f":{k}" for k in clean_listing)
+
         cursor = conn.execute(
             f"INSERT OR IGNORE INTO listings ({cols}) VALUES ({vals})",
             listing,
         )
+
         conn.commit()
+
     return cursor.rowcount > 0
 
 
