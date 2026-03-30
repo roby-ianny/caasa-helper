@@ -21,5 +21,5 @@ other things
 - [ ] Add error handling
 
 Possible improvement
-- [ ] Generate documentation with pdoc
+- [x] Generate documentation with pdoc
 - [ ] Display db on a simple web page with flask

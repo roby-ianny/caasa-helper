@@ -1,7 +1,5 @@
 import sqlite3
 
-from scraper import __sanitize_key
-
 DB_PATH = "caasa.db"
 
 
@@ -65,10 +63,10 @@ def insert_listing(listing: dict) -> bool:
     vals = ", ".join([f":{k}" for k in listing])
 
     with get_connection() as conn:
-        ensure_columns(conn, clean_listing)
+        ensure_columns(conn, listing)
 
-        columns = ", ".join(f"[{k}]" for k in clean_listing)
-        placeholders = ", ".join(f":{k}" for k in clean_listing)
+        cols = ", ".join(f"[{k}]" for k in listing)
+        vals = ", ".join(f":{k}" for k in listing)
 
         cursor = conn.execute(
             f"INSERT OR IGNORE INTO listings ({cols}) VALUES ({vals})",
