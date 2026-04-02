@@ -1,5 +1,7 @@
 from argparse import ArgumentParser
 
+import typer
+
 from db import bulk_insert, init_db
 from exporter import export_csv
 from scraper import scrape_search
@@ -62,4 +64,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    typer.run(main)
